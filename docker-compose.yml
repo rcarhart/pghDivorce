@@ -1,0 +1,7 @@
+services:
+  pittsburghdivorce:
+    build: .
+    container_name: pittsburghdivorce
+    ports:
+      - "8100:80"
+    restart: unless-stopped

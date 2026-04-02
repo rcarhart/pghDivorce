@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PittsburghDivorce | Confidential Divorce Consultation Requests</title>
+  <meta name="description" content="PittsburghDivorce helps people in the Pittsburgh area request a confidential divorce consultation and connect with a qualified attorney." />
+  <style>
+    :root {
+      --black: #1c1c1c;
+      --gold: #ffb81c;
+      --steel: #5d6d7e;
+      --light: #f7f7f5;
+      --panel: #ffffff;
+      --soft: #eef2f5;
+      --text: #1f2933;
+      --muted: #66727f;
+      --border: rgba(31, 41, 51, 0.10);
+      --shadow: 0 16px 40px rgba(20, 24, 28, 0.10);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 16px;
+      --max: 1180px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #f4f5f6 0%, #fcfcfb 100%);
+    }
+    a { color: inherit; text-decoration: none; }
+    .container {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 0 22px;
+    }
+    .topbar {
+      background: var(--black);
+      color: white;
+      font-size: 14px;
+    }
+    .topbar .container {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding-top: 10px;
+      padding-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .site-header {
+      background: rgba(255,255,255,0.9);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+    .site-header .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding-top: 18px;
+      padding-bottom: 18px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--black), #39424b);
+      color: var(--gold);
+      display: grid;
+      place-items: center;
+      font-size: 22px;
+      box-shadow: var(--shadow);
+    }
+    .brand small {
+      display: block;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-size: 11px;
+    }
+    nav {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .nav-link { color: var(--muted); font-weight: 600; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 0;
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--gold); color: #171717; }
+    .btn-dark { background: var(--black); color: white; }
+    .hero {
+      padding: 64px 0 36px;
+      background:
+        linear-gradient(110deg, rgba(28,28,28,0.94), rgba(28,28,28,0.78)),
+        url('https://images.unsplash.com/photo-1518391846015-55a9cc003b25?auto=format&fit=crop&w=1600&q=80') center/cover;
+      color: white;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.9fr;
+      gap: 30px;
+      align-items: start;
+    }
+    .eyebrow {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 184, 28, 0.12);
+      border: 1px solid rgba(255, 184, 28, 0.24);
+      color: #ffd978;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(38px, 5vw, 64px);
+      line-height: 1.02;
+      letter-spacing: -0.03em;
+    }
+    .hero p.lead {
+      font-size: 19px;
+      line-height: 1.65;
+      color: rgba(255,255,255,0.84);
+      max-width: 760px;
+      margin: 18px 0 22px;
+    }
+    .hero-points {
+      display: grid;
+      gap: 12px;
+      margin: 22px 0 28px;
+    }
+    .hero-points div {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      color: rgba(255,255,255,0.88);
+    }
+    .hero-points span.icon {
+      color: var(--gold);
+      font-weight: 900;
+    }
+    .lead-card {
+      background: rgba(255,255,255,0.98);
+      color: var(--text);
+      border-radius: var(--radius-xl);
+      padding: 24px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.18);
+    }
+    .lead-card h2 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      color: var(--black);
+    }
+    .lead-card p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    form {
+      display: grid;
+      gap: 14px;
+    }
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    label {
+      display: grid;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid rgba(31,41,51,0.12);
+      background: #fbfbfa;
+      border-radius: 14px;
+      padding: 14px 15px;
+      font: inherit;
+      color: var(--text);
+    }
+    textarea { min-height: 120px; resize: vertical; }
+    .consent {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .consent input { width: auto; margin-top: 3px; }
+    .trust-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 22px;
+    }
+    .trust-box {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 18px;
+      padding: 16px;
+    }
+    section.content {
+      padding: 68px 0;
+    }
+    .section-header {
+      max-width: 740px;
+      margin-bottom: 28px;
+    }
+    .section-header h2 {
+      margin: 0 0 10px;
+      font-size: 38px;
+      letter-spacing: -0.02em;
+    }
+    .section-header p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 17px;
+    }
+    .cards-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+    }
+    .card h3 { margin: 0 0 10px; font-size: 22px; }
+    .card p, .card li { color: var(--muted); line-height: 1.7; }
+    .process {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .step {
+      background: linear-gradient(180deg, #ffffff, #f8f8f6);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    .step .num {
+      width: 42px; height: 42px; border-radius: 14px;
+      display: grid; place-items: center;
+      background: var(--gold); color: #1d1d1d; font-weight: 800;
+      margin-bottom: 14px;
+    }
+    .city-band {
+      background: linear-gradient(135deg, #1d2328, #3a454f);
+      color: white;
+      border-radius: 28px;
+      padding: 30px;
+      box-shadow: var(--shadow);
+    }
+    .city-band h3 { margin-top: 0; font-size: 28px; }
+    .faq {
+      display: grid;
+      gap: 14px;
+    }
+    .faq details {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+    }
+    .faq summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--black);
+    }
+    .site-footer {
+      background: var(--black);
+      color: rgba(255,255,255,0.82);
+      padding: 26px 0;
+      margin-top: 30px;
+    }
+    .site-footer .container {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 1100px) {
+      .hero-grid, .cards-3, .process, .trust-row { grid-template-columns: 1fr; }
+      .field-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="container">
+      <div>Confidential Pittsburgh-area divorce consultation requests</div>
+      <div>Built to connect prospective clients with qualified attorneys</div>
+    </div>
+  </div>
+
+  <header class="site-header">
+    <div class="container">
+      <div class="brand">
+        <div class="brand-mark">PGH</div>
+        <div>
+          PittsburghDivorce
+          <small>Confidential Consultation Requests</small>
+        </div>
+      </div>
+      <nav>
+        <a class="nav-link" href="#how-it-works">How It Works</a>
+        <a class="nav-link" href="#why-pittsburgh">Why PittsburghDivorce</a>
+        <a class="nav-link" href="#faq">FAQ</a>
+        <a class="btn btn-primary" href="#consultation-form">Request a Consultation</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container hero-grid">
+      <div>
+        <div class="eyebrow">Professional • Local • Confidential</div>
+        <h1>Pittsburgh divorce leads designed to connect people with the right attorney.</h1>
+        <p class="lead">PittsburghDivorce is a professional intake website for people in the Pittsburgh area who are actively looking for divorce representation. Visitors can submit their situation privately, and qualified attorneys can follow up directly.</p>
+        <div class="hero-points">
+          <div><span class="icon">●</span><span>Professional, serious tone that feels trustworthy to potential clients.</span></div>
+          <div><span class="icon">●</span><span>Pittsburgh-inspired visual identity with black, gold, and steel accents.</span></div>
+          <div><span class="icon">●</span><span>Lead-focused structure built to capture actionable attorney consultation requests.</span></div>
+        </div>
+        <div class="actions">
+          <a class="btn btn-primary" href="#consultation-form">Start Confidential Request</a>
+          <a class="btn btn-dark" href="#how-it-works">See How It Works</a>
+        </div>
+        <div class="trust-row">
+          <div class="trust-box"><strong>Confidential Intake</strong><br /><span>Structured forms that encourage serious inquiries.</span></div>
+          <div class="trust-box"><strong>Pittsburgh-Focused</strong><br /><span>Local, relevant positioning for the regional market.</span></div>
+          <div class="trust-box"><strong>Attorney-Ready Leads</strong><br /><span>Collects the key information attorneys want first.</span></div>
+        </div>
+      </div>
+
+      <div class="lead-card" id="consultation-form">
+        <h2>Request a Confidential Consultation</h2>
+        <p>Complete the form below so an attorney can review your situation and contact you about next steps.</p>
+        <form>
+          <div class="field-grid">
+            <label>
+              First Name
+              <input type="text" placeholder="First name" />
+            </label>
+            <label>
+              Last Name
+              <input type="text" placeholder="Last name" />
+            </label>
+          </div>
+          <div class="field-grid">
+            <label>
+              Email Address
+              <input type="email" placeholder="you@example.com" />
+            </label>
+            <label>
+              Phone Number
+              <input type="tel" placeholder="(412) 555-0123" />
+            </label>
+          </div>
+          <div class="field-grid">
+            <label>
+              County
+              <select>
+                <option>Allegheny County</option>
+                <option>Washington County</option>
+                <option>Westmoreland County</option>
+                <option>Butler County</option>
+                <option>Beaver County</option>
+                <option>Other Pennsylvania County</option>
+              </select>
+            </label>
+            <label>
+              Stage of Divorce
+              <select>
+                <option>Just exploring options</option>
+                <option>Ready to file soon</option>
+                <option>Already filed</option>
+                <option>Need help with custody / support issues</option>
+              </select>
+            </label>
+          </div>
+          <div class="field-grid">
+            <label>
+              Children Involved?
+              <select>
+                <option>No</option>
+                <option>Yes</option>
+              </select>
+            </label>
+            <label>
+              Property / Asset Complexity
+              <select>
+                <option>Simple</option>
+                <option>Moderate</option>
+                <option>Complex</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            Briefly describe your situation
+            <textarea placeholder="Tell us a little about your situation, timing, and what kind of help you may need."></textarea>
+          </label>
+          <label class="consent">
+            <input type="checkbox" />
+            <span>I understand this request is to be contacted about legal services and that submitting this form does not create an attorney-client relationship.</span>
+          </label>
+          <button class="btn btn-primary" type="button">Submit Consultation Request</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="content" id="how-it-works">
+    <div class="container">
+      <div class="section-header">
+        <h2>How PittsburghDivorce works</h2>
+        <p>The website is designed as a straightforward intake funnel: attract local search traffic, establish trust quickly, gather the right information, and package leads for attorneys who want serious Pittsburgh-area divorce prospects.</p>
+      </div>
+      <div class="process">
+        <div class="step">
+          <div class="num">1</div>
+          <h3>Visitor lands on the site</h3>
+          <p>They see a professional Pittsburgh-focused brand and a clear message about confidential consultation requests.</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <h3>They submit their details</h3>
+          <p>The form captures location, timing, complexity, family context, and a short written description.</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <h3>Lead is reviewed</h3>
+          <p>Each inquiry can be categorized, qualified, and prepared for follow-up by the right attorney.</p>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <h3>Attorney follows up</h3>
+          <p>Qualified attorneys can receive the lead and contact the prospective client directly.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="content" id="why-pittsburgh" style="padding-top:0;">
+    <div class="container">
+      <div class="section-header">
+        <h2>Professional enough for attorneys. Local enough for Pittsburgh.</h2>
+        <p>This concept balances Pittsburgh identity with legal-industry seriousness. It references the city with black-and-gold energy and steel-inspired structure, without slipping into sports-bar branding or gimmicks.</p>
+      </div>
+      <div class="cards-3">
+        <div class="card">
+          <h3>Built for local trust</h3>
+          <p>The tone is direct, calm, and practical — the kind of presentation that helps someone in a stressful situation feel comfortable filling out a form.</p>
+        </div>
+        <div class="card">
+          <h3>Built for conversion</h3>
+          <p>The structure keeps attention on one job: getting a serious visitor to complete a consultation request with enough useful information to make the lead valuable.</p>
+        </div>
+        <div class="card">
+          <h3>Built for resale to attorneys</h3>
+          <p>The intake questions are framed around legal relevance so the site can generate cleaner, more usable lead data for lawyers who buy those leads.</p>
+        </div>
+      </div>
+      <div style="margin-top:28px;" class="city-band">
+        <h3>Pittsburgh theme direction</h3>
+        <p>The visual direction uses a professional mix of black, gold, steel-gray, and bright neutral space. The result feels rooted in Pittsburgh while still appropriate for legal lead generation. Think “serious downtown firm with local identity,” not “sports fan landing page.”</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="content" id="faq" style="padding-top:0;">
+    <div class="container">
+      <div class="section-header">
+        <h2>FAQ</h2>
+        <p>This section helps reduce hesitation, increase trust, and clarify expectations before someone submits a lead.</p>
+      </div>
+      <div class="faq">
+        <details>
+          <summary>Is this a law firm?</summary>
+          <p>PittsburghDivorce is positioned as a consultation-request website that helps connect prospective clients with attorneys. It is not itself a law firm.</p>
+        </details>
+        <details>
+          <summary>Is my information confidential?</summary>
+          <p>The site is designed to request sensitive information in a professional and private way, with clear language that sets expectations around contact and representation.</p>
+        </details>
+        <details>
+          <summary>Do I have to be ready to file right now?</summary>
+          <p>No. The lead form can be used by people who are just exploring, preparing to file, or already in process and looking for help.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div>© PittsburghDivorce — Professional Pittsburgh divorce consultation requests</div>
+      <div>This is a lead-generation website concept for attorney follow-up.</div>
+    </div>
+  </footer>
+</body>
+</html>
