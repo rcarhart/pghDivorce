@@ -15,6 +15,3 @@ docker compose up --build
 
 The current container serves the site on port `8100`.
 
-## Scope note
-
-This project is intentionally separate from the homelab repo. It is a standalone product, not a homelab-operated service definition.
