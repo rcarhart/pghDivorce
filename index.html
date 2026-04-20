@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PittsburghDivorce | Confidential Divorce Consultation Requests</title>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <meta name="description" content="PittsburghDivorce helps people in the Pittsburgh area request a confidential divorce consultation and connect with a qualified attorney." />
   <style>
     :root {
@@ -371,31 +372,38 @@
       <div class="lead-card" id="consultation-form">
         <h2>Request a Confidential Consultation</h2>
         <p>Complete the form below so an attorney can review your situation and contact you about next steps.</p>
-        <form>
+
+        <div id="form-success" style="display:none; text-align:center; padding: 32px 0;">
+          <div style="font-size:48px; margin-bottom:12px;">✓</div>
+          <h3 style="margin:0 0 8px; color: var(--black);">Request Received</h3>
+          <p style="color:var(--muted); margin:0;">An attorney will review your information and be in touch shortly.</p>
+        </div>
+
+        <form id="lead-form">
           <div class="field-grid">
             <label>
               First Name
-              <input type="text" placeholder="First name" />
+              <input type="text" name="first_name" placeholder="First name" required />
             </label>
             <label>
               Last Name
-              <input type="text" placeholder="Last name" />
+              <input type="text" name="last_name" placeholder="Last name" required />
             </label>
           </div>
           <div class="field-grid">
             <label>
               Email Address
-              <input type="email" placeholder="you@example.com" />
+              <input type="email" name="email" placeholder="you@example.com" required />
             </label>
             <label>
               Phone Number
-              <input type="tel" placeholder="(412) 555-0123" />
+              <input type="tel" name="phone" placeholder="(412) 555-0123" />
             </label>
           </div>
           <div class="field-grid">
             <label>
               County
-              <select>
+              <select name="county">
                 <option>Allegheny County</option>
                 <option>Washington County</option>
                 <option>Westmoreland County</option>
@@ -406,7 +414,7 @@
             </label>
             <label>
               Stage of Divorce
-              <select>
+              <select name="divorce_stage">
                 <option>Just exploring options</option>
                 <option>Ready to file soon</option>
                 <option>Already filed</option>
@@ -417,14 +425,14 @@
           <div class="field-grid">
             <label>
               Children Involved?
-              <select>
+              <select name="children_involved">
                 <option>No</option>
                 <option>Yes</option>
               </select>
             </label>
             <label>
               Property / Asset Complexity
-              <select>
+              <select name="asset_complexity">
                 <option>Simple</option>
                 <option>Moderate</option>
                 <option>Complex</option>
@@ -433,13 +441,15 @@
           </div>
           <label>
             Briefly describe your situation
-            <textarea placeholder="Tell us a little about your situation, timing, and what kind of help you may need."></textarea>
+            <textarea name="description" placeholder="Tell us a little about your situation, timing, and what kind of help you may need."></textarea>
           </label>
           <label class="consent">
-            <input type="checkbox" />
+            <input type="checkbox" name="consent" />
             <span>I understand this request is to be contacted about legal services and that submitting this form does not create an attorney-client relationship.</span>
           </label>
-          <button class="btn btn-primary" type="button">Submit Consultation Request</button>
+          <div class="cf-turnstile" data-sitekey="YOUR_TURNSTILE_SITE_KEY" data-theme="light"></div>
+          <div id="form-error" style="display:none; color:#c0392b; font-size:14px; font-weight:600;"></div>
+          <button class="btn btn-primary" type="submit" id="submit-btn">Submit Consultation Request</button>
         </form>
       </div>
     </div>
@@ -532,5 +542,71 @@
       <div>This is a lead-generation website concept for attorney follow-up.</div>
     </div>
   </footer>
+  <script>
+    document.getElementById('lead-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const form = e.target;
+      const btn = document.getElementById('submit-btn');
+      const errorEl = document.getElementById('form-error');
+
+      const consentChecked = form.elements['consent'].checked;
+      if (!consentChecked) {
+        errorEl.textContent = 'Please check the consent box before submitting.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      const turnstileToken = document.querySelector('[name="cf-turnstile-response"]')?.value;
+      if (!turnstileToken) {
+        errorEl.textContent = 'Please complete the bot verification above.';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
+      errorEl.style.display = 'none';
+
+      const payload = {
+        first_name: form.elements['first_name'].value.trim(),
+        last_name: form.elements['last_name'].value.trim(),
+        email: form.elements['email'].value.trim(),
+        phone: form.elements['phone'].value.trim(),
+        county: form.elements['county'].value,
+        divorce_stage: form.elements['divorce_stage'].value,
+        children_involved: form.elements['children_involved'].value,
+        asset_complexity: form.elements['asset_complexity'].value,
+        description: form.elements['description'].value.trim(),
+        consent: true,
+        turnstile_token: turnstileToken,
+      };
+
+      try {
+        const res = await fetch('/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          form.style.display = 'none';
+          document.getElementById('form-success').style.display = 'block';
+        } else {
+          errorEl.textContent = data.error || 'Something went wrong. Please try again.';
+          errorEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Submit Consultation Request';
+        }
+      } catch {
+        errorEl.textContent = 'Network error. Please check your connection and try again.';
+        errorEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Submit Consultation Request';
+      }
+    });
+  </script>
 </body>
 </html>
