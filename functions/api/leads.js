@@ -140,23 +140,21 @@ export async function onRequestPost(context) {
     return corsJson({ error: 'Bot verification failed. Please try again.' }, { status: 403 });
   }
 
-  // Determine lead status before inserting
-  let status = 'new';
-
-  if (isSpamName(first_name) || isSpamName(last_name)) {
-    status = 'spam';
-  } else {
-    // Duplicate check: same email submitted in the last 24 hours
-    const dupCheck = await env.DB
-      .prepare(`SELECT id FROM leads WHERE email = ? AND created_at > datetime('now', '-1 day') LIMIT 1`)
-      .bind(email.toLowerCase())
-      .first();
-    if (dupCheck) status = 'duplicate';
-  }
-
   const created_at = new Date().toISOString();
 
   try {
+    let status = 'new';
+
+    if (isSpamName(first_name) || isSpamName(last_name)) {
+      status = 'spam';
+    } else {
+      const dupCheck = await env.DB
+        .prepare(`SELECT id FROM leads WHERE email = ? AND created_at > datetime('now', '-1 day') LIMIT 1`)
+        .bind(email.toLowerCase())
+        .first();
+      if (dupCheck) status = 'duplicate';
+    }
+
     await env.DB.prepare(`
       INSERT INTO leads
         (first_name, last_name, email, phone, county, divorce_stage,
@@ -177,13 +175,12 @@ export async function onRequestPost(context) {
         });
       } catch (emailErr) {
         console.error('Email send failed:', emailErr);
-        // Don't fail the request if email fails — lead is already saved
       }
     }
 
     return corsJson({ success: true });
   } catch (err) {
-    console.error('DB insert failed:', err);
+    console.error('DB error:', err);
     return corsJson({ error: 'Failed to save your request. Please try again.' }, { status: 500 });
   }
 }
