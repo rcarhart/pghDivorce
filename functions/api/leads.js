@@ -1,3 +1,96 @@
+const ALLOWED_ORIGIN = 'https://pittsburghdivorces.com';
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+function corsJson(data, init = {}) {
+  return Response.json(data, { ...init, headers: { ...CORS_HEADERS, ...(init.headers ?? {}) } });
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const FIELD_LIMITS = {
+  first_name: 50,
+  last_name: 50,
+  email: 100,
+  phone: 20,
+  county: 60,
+  divorce_stage: 60,
+  children_involved: 20,
+  asset_complexity: 20,
+  description: 2000,
+};
+
+const SPAM_NAMES = /^(test|testing|asdf|foo|bar|baz|aaa|bbb|xxx|yyy|zzz|123|admin|name|user|none|na|n\/a)$/i;
+
+function isSpamName(name) {
+  if (!name || name.length < 2) return true;
+  if (SPAM_NAMES.test(name.trim())) return true;
+  // single repeated character: "aaaa", "1111"
+  if (/^(.)\1+$/.test(name.trim())) return true;
+  return false;
+}
+
+async function sendLeadEmail(env, lead) {
+  const rows = [
+    ['Name', `${lead.first_name} ${lead.last_name}`],
+    ['Email', lead.email],
+    ['Phone', lead.phone || '—'],
+    ['County', lead.county || '—'],
+    ['Divorce Stage', lead.divorce_stage || '—'],
+    ['Children Involved', lead.children_involved || '—'],
+    ['Asset Complexity', lead.asset_complexity || '—'],
+    ['Submitted', lead.created_at],
+    ['IP Address', lead.ip_address || '—'],
+  ];
+
+  const tableRows = rows
+    .map(([label, value]) => `
+      <tr>
+        <td style="padding:8px 12px;background:#f5f5f5;font-weight:600;width:160px;border-bottom:1px solid #e0e0e0">${label}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e0e0e0">${value}</td>
+      </tr>`)
+    .join('');
+
+  const description = lead.description
+    ? `<h3 style="margin:24px 0 8px;font-size:14px;color:#555">Situation Description</h3>
+       <p style="margin:0;padding:12px;background:#f9f9f9;border-left:3px solid #c8a96e;font-style:italic">${lead.description}</p>`
+    : '';
+
+  const html = `<!DOCTYPE html>
+<html>
+<body style="font-family:Arial,sans-serif;color:#222;max-width:600px;margin:0 auto;padding:24px">
+  <h2 style="margin:0 0 4px;color:#1a1a1a">New Lead — Pittsburgh Divorce</h2>
+  <p style="margin:0 0 20px;color:#777;font-size:13px">Submitted via pittsburghdivorces.com</p>
+  <table style="width:100%;border-collapse:collapse;font-size:14px">
+    ${tableRows}
+  </table>
+  ${description}
+  <p style="margin:32px 0 0;font-size:12px;color:#aaa">
+    This lead was automatically sent from pittsburghdivorces.com.
+    Log in to Cloudflare D1 to view all leads.
+  </p>
+</body>
+</html>`;
+
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'Pittsburgh Divorce Leads <leads@pittsburghdivorces.com>',
+      to: ['carhartconsulting@outlook.com'],
+      subject: `New Lead: ${lead.first_name} ${lead.last_name}${lead.county ? ` — ${lead.county}` : ''}`,
+      html,
+    }),
+  });
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -5,7 +98,7 @@ export async function onRequestPost(context) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: 'Invalid request body.' }, { status: 400 });
+    return corsJson({ error: 'Invalid request body.' }, { status: 400 });
   }
 
   const {
@@ -16,7 +109,18 @@ export async function onRequestPost(context) {
   } = body;
 
   if (!first_name || !last_name || !email || !consent) {
-    return Response.json({ error: 'Please fill out all required fields.' }, { status: 400 });
+    return corsJson({ error: 'Please fill out all required fields.' }, { status: 400 });
+  }
+
+  for (const [field, max] of Object.entries(FIELD_LIMITS)) {
+    const val = body[field];
+    if (val && typeof val === 'string' && val.length > max) {
+      return corsJson({ error: `${field} exceeds maximum allowed length.` }, { status: 400 });
+    }
+  }
+
+  if (!EMAIL_RE.test(email)) {
+    return corsJson({ error: 'Please enter a valid email address.' }, { status: 400 });
   }
 
   // Verify Turnstile token server-side
@@ -33,35 +137,57 @@ export async function onRequestPost(context) {
 
   const { success } = await verifyRes.json();
   if (!success) {
-    return Response.json({ error: 'Bot verification failed. Please try again.' }, { status: 403 });
+    return corsJson({ error: 'Bot verification failed. Please try again.' }, { status: 403 });
   }
+
+  // Determine lead status before inserting
+  let status = 'new';
+
+  if (isSpamName(first_name) || isSpamName(last_name)) {
+    status = 'spam';
+  } else {
+    // Duplicate check: same email submitted in the last 24 hours
+    const dupCheck = await env.DB
+      .prepare(`SELECT id FROM leads WHERE email = ? AND created_at > datetime('now', '-1 day') LIMIT 1`)
+      .bind(email.toLowerCase())
+      .first();
+    if (dupCheck) status = 'duplicate';
+  }
+
+  const created_at = new Date().toISOString();
 
   try {
     await env.DB.prepare(`
       INSERT INTO leads
         (first_name, last_name, email, phone, county, divorce_stage,
-         children_involved, asset_complexity, description, consent, ip_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         children_involved, asset_complexity, description, consent, ip_address, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      first_name, last_name, email,
+      first_name, last_name, email.toLowerCase(),
       phone ?? null, county ?? null, divorce_stage ?? null,
       children_involved ?? null, asset_complexity ?? null,
-      description ?? null, consent ? 1 : 0, ip,
+      description ?? null, consent ? 1 : 0, ip, status,
     ).run();
 
-    return Response.json({ success: true });
+    if (status === 'new') {
+      try {
+        await sendLeadEmail(env, {
+          first_name, last_name, email, phone, county, divorce_stage,
+          children_involved, asset_complexity, description, ip_address: ip, created_at,
+        });
+      } catch (emailErr) {
+        console.error('Email send failed:', emailErr);
+        // Don't fail the request if email fails — lead is already saved
+      }
+    }
+
+    return corsJson({ success: true });
   } catch (err) {
     console.error('DB insert failed:', err);
-    return Response.json({ error: 'Failed to save your request. Please try again.' }, { status: 500 });
+    return corsJson({ error: 'Failed to save your request. Please try again.' }, { status: 500 });
   }
 }
 
 export async function onRequestOptions() {
-  return new Response(null, {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return new Response(null, { headers: CORS_HEADERS });
 }
