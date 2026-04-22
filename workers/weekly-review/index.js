@@ -1,6 +1,58 @@
 const RECIPIENT = 'carhartconsulting@outlook.com';
 const FROM = 'Pittsburgh Divorce Leads <leads@pittsburghdivorces.com>';
 
+async function getSheetsToken(env) {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: env.GOOGLE_SHEETS_CLIENT_ID,
+      client_secret: env.GOOGLE_SHEETS_CLIENT_SECRET,
+      refresh_token: env.GOOGLE_SHEETS_REFRESH_TOKEN,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const data = await res.json();
+  if (!data.access_token) throw new Error(`Sheets token error: ${JSON.stringify(data)}`);
+  return data.access_token;
+}
+
+async function syncLeadsToSheet(env, leads) {
+  const token = await getSheetsToken(env);
+  const sheetId = env.GOOGLE_SHEET_ID;
+
+  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A:Z:clear`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+
+  const headers = [
+    'ID', 'Submitted', 'First Name', 'Last Name', 'Email', 'Phone',
+    'County', 'Divorce Stage', 'Children Involved', 'Asset Complexity', 'Description',
+  ];
+  const rows = [
+    headers,
+    ...leads.map(l => [
+      l.id,
+      l.created_at?.slice(0, 16).replace('T', ' ') ?? '',
+      l.first_name, l.last_name, l.email,
+      l.phone ?? '', l.county ?? '', l.divorce_stage ?? '',
+      l.children_involved ?? '', l.asset_complexity ?? '', l.description ?? '',
+    ]),
+  ];
+
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A1?valueInputOption=USER_ENTERED`,
+    {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: rows }),
+    }
+  );
+  const data = await res.json();
+  if (data.error) throw new Error(`Sheets write error: ${JSON.stringify(data.error)}`);
+}
+
 export default {
   async scheduled(event, env) {
     const now = new Date();
@@ -37,6 +89,22 @@ export default {
         (week_ending, total_leads, qualified_leads, spam_leads, duplicate_leads, ad_spend, cost_per_lead)
       VALUES (?, ?, ?, ?, ?, NULL, NULL)
     `).bind(weekEnding, total, tally.new, tally.spam, tally.duplicate).run();
+
+    // Sync all qualified leads to Google Sheet (if credentials are configured)
+    if (env.GOOGLE_SHEET_ID && env.GOOGLE_SHEETS_REFRESH_TOKEN) {
+      try {
+        const allLeads = await env.DB.prepare(`
+          SELECT id, created_at, first_name, last_name, email, phone,
+                 county, divorce_stage, children_involved, asset_complexity, description
+          FROM leads
+          WHERE status = 'new'
+          ORDER BY created_at DESC
+        `).all();
+        await syncLeadsToSheet(env, allLeads.results ?? []);
+      } catch (err) {
+        console.error('Sheets sync failed:', err);
+      }
+    }
 
     const html = buildEmail(weekStart, weekEnding, tally, total, qualified.results ?? []);
 
