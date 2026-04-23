@@ -17,40 +17,59 @@ async function getSheetsToken(env) {
   return data.access_token;
 }
 
+const SHEET_HEADERS = [
+  'ID', 'Submitted', 'First Name', 'Last Name', 'Email', 'Phone',
+  'County', 'Divorce Stage', 'Children Involved', 'Asset Complexity', 'Description',
+];
+
+function leadToRow(l) {
+  return [
+    l.id,
+    l.created_at?.slice(0, 16).replace('T', ' ') ?? '',
+    l.first_name, l.last_name, l.email,
+    l.phone ?? '', l.county ?? '', l.divorce_stage ?? '',
+    l.children_involved ?? '', l.asset_complexity ?? '', l.description ?? '',
+  ];
+}
+
 async function syncLeadsToSheet(env, leads) {
   const token = await getSheetsToken(env);
   const sheetId = env.GOOGLE_SHEET_ID;
+  const authHeader = { 'Authorization': `Bearer ${token}` };
 
-  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A:Z:clear`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
+  // Read existing IDs from column A — never clear or overwrite existing rows
+  const readRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A:A`,
+    { headers: authHeader }
+  );
+  const readData = await readRes.json();
+  const existingValues = readData.values ?? [];
 
-  const headers = [
-    'ID', 'Submitted', 'First Name', 'Last Name', 'Email', 'Phone',
-    'County', 'Divorce Stage', 'Children Involved', 'Asset Complexity', 'Description',
-  ];
-  const rows = [
-    headers,
-    ...leads.map(l => [
-      l.id,
-      l.created_at?.slice(0, 16).replace('T', ' ') ?? '',
-      l.first_name, l.last_name, l.email,
-      l.phone ?? '', l.county ?? '', l.divorce_stage ?? '',
-      l.children_involved ?? '', l.asset_complexity ?? '', l.description ?? '',
-    ]),
-  ];
+  if (existingValues.length === 0) {
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A1?valueInputOption=USER_ENTERED`,
+      {
+        method: 'PUT',
+        headers: { ...authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: [SHEET_HEADERS] }),
+      }
+    );
+  }
+
+  const existingIds = new Set(existingValues.slice(1).map(r => String(r[0])).filter(Boolean));
+  const newLeads = leads.filter(l => !existingIds.has(String(l.id)));
+  if (newLeads.length === 0) return;
 
   const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A1?valueInputOption=USER_ENTERED`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A:K:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
     {
-      method: 'PUT',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values: rows }),
+      method: 'POST',
+      headers: { ...authHeader, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: newLeads.map(leadToRow) }),
     }
   );
   const data = await res.json();
-  if (data.error) throw new Error(`Sheets write error: ${JSON.stringify(data.error)}`);
+  if (data.error) throw new Error(`Sheets append error: ${JSON.stringify(data.error)}`);
 }
 
 export default {

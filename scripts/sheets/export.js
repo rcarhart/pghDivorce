@@ -76,33 +76,63 @@ async function getSheetsToken(env) {
   return data.access_token;
 }
 
-// ── Google Sheets write ──────────────────────────────────────────────────────
+const SHEET_HEADERS = [
+  'ID', 'Submitted', 'First Name', 'Last Name', 'Email', 'Phone',
+  'County', 'Divorce Stage', 'Children Involved', 'Asset Complexity', 'Description',
+];
 
-async function clearSheet(sheetsToken, sheetId) {
-  await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A:Z:clear`,
-    {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${sheetsToken}` },
-    }
-  );
+function leadToRow(l) {
+  return [
+    l.id,
+    l.created_at?.slice(0, 16).replace('T', ' ') ?? '',
+    l.first_name, l.last_name, l.email,
+    l.phone ?? '', l.county ?? '', l.divorce_stage ?? '',
+    l.children_involved ?? '', l.asset_complexity ?? '', l.description ?? '',
+  ];
 }
 
-async function writeSheet(sheetsToken, sheetId, rows) {
+// ── Google Sheets write ──────────────────────────────────────────────────────
+
+async function appendNewLeads(sheetsToken, sheetId, leads) {
+  const authHeader = { 'Authorization': `Bearer ${sheetsToken}` };
+
+  // Read existing ID column to find what's already in the sheet
+  const readRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A:A`,
+    { headers: authHeader }
+  );
+  const readData = await readRes.json();
+  const existingValues = readData.values ?? [];
+
+  // Write headers if sheet is empty
+  if (existingValues.length === 0) {
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A1?valueInputOption=USER_ENTERED`,
+      {
+        method: 'PUT',
+        headers: { ...authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: [SHEET_HEADERS] }),
+      }
+    );
+  }
+
+  // Skip row 1 (headers), collect IDs already in the sheet
+  const existingIds = new Set(existingValues.slice(1).map(r => String(r[0])).filter(Boolean));
+  const newLeads = leads.filter(l => !existingIds.has(String(l.id)));
+
+  if (newLeads.length === 0) return 0;
+
   const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A1?valueInputOption=USER_ENTERED`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A:K:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
     {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${sheetsToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ values: rows }),
+      method: 'POST',
+      headers: { ...authHeader, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: newLeads.map(leadToRow) }),
     }
   );
   const data = await res.json();
-  if (data.error) throw new Error(`Sheets write error: ${JSON.stringify(data.error)}`);
-  return data;
+  if (data.error) throw new Error(`Sheets append error: ${JSON.stringify(data.error)}`);
+  return newLeads.length;
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
@@ -121,36 +151,11 @@ const leads = await queryD1(env, `
 
 console.log(`Found ${leads.length} qualified leads.`);
 
-const headers = [
-  'ID', 'Submitted', 'First Name', 'Last Name', 'Email', 'Phone',
-  'County', 'Divorce Stage', 'Children Involved', 'Asset Complexity', 'Description',
-];
-
-const rows = [
-  headers,
-  ...leads.map(l => [
-    l.id,
-    l.created_at?.slice(0, 16).replace('T', ' ') ?? '',
-    l.first_name,
-    l.last_name,
-    l.email,
-    l.phone ?? '',
-    l.county ?? '',
-    l.divorce_stage ?? '',
-    l.children_involved ?? '',
-    l.asset_complexity ?? '',
-    l.description ?? '',
-  ]),
-];
-
 console.log('Authenticating with Google Sheets...');
 const sheetsToken = await getSheetsToken(env);
 
-console.log('Clearing existing sheet data...');
-await clearSheet(sheetsToken, env.GOOGLE_SHEET_ID);
+console.log('Appending any new leads to sheet (existing rows untouched)...');
+const added = await appendNewLeads(sheetsToken, env.GOOGLE_SHEET_ID, leads);
 
-console.log('Writing leads to sheet...');
-await writeSheet(sheetsToken, env.GOOGLE_SHEET_ID, rows);
-
-console.log(`\n✓ ${leads.length} leads exported to Google Sheet.`);
+console.log(`\n✓ ${added} new lead(s) added to Google Sheet (${leads.length - added} already present).`);
 console.log(`  https://docs.google.com/spreadsheets/d/${env.GOOGLE_SHEET_ID}`);

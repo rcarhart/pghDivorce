@@ -34,6 +34,21 @@ function isSpamName(name) {
   return false;
 }
 
+const SHEET_HEADERS = [
+  'ID', 'Submitted', 'First Name', 'Last Name', 'Email', 'Phone',
+  'County', 'Divorce Stage', 'Children Involved', 'Asset Complexity', 'Description',
+];
+
+function leadToRow(lead) {
+  return [
+    lead.id,
+    lead.created_at?.slice(0, 16).replace('T', ' ') ?? '',
+    lead.first_name, lead.last_name, lead.email,
+    lead.phone ?? '', lead.county ?? '', lead.divorce_stage ?? '',
+    lead.children_involved ?? '', lead.asset_complexity ?? '', lead.description ?? '',
+  ];
+}
+
 async function appendLeadToSheet(env, lead) {
   if (!env.GOOGLE_SHEET_ID || !env.GOOGLE_SHEETS_REFRESH_TOKEN) return;
 
@@ -50,20 +65,32 @@ async function appendLeadToSheet(env, lead) {
   const { access_token } = await tokenRes.json();
   if (!access_token) throw new Error('Sheets token refresh failed');
 
-  const row = [
-    lead.id,
-    lead.created_at?.slice(0, 16).replace('T', ' ') ?? '',
-    lead.first_name, lead.last_name, lead.email,
-    lead.phone ?? '', lead.county ?? '', lead.divorce_stage ?? '',
-    lead.children_involved ?? '', lead.asset_complexity ?? '', lead.description ?? '',
-  ];
+  const sheetId = env.GOOGLE_SHEET_ID;
+  const authHeader = { 'Authorization': `Bearer ${access_token}` };
+
+  // Write header row if the sheet is empty
+  const checkRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A1`,
+    { headers: authHeader }
+  );
+  const checkData = await checkRes.json();
+  if (!checkData.values?.length) {
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A1?valueInputOption=USER_ENTERED`,
+      {
+        method: 'PUT',
+        headers: { ...authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: [SHEET_HEADERS] }),
+      }
+    );
+  }
 
   await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/Leads!A:K:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Leads!A:K:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
     {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values: [row] }),
+      headers: { ...authHeader, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: [leadToRow(lead)] }),
     }
   );
 }
