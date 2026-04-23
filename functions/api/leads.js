@@ -34,6 +34,40 @@ function isSpamName(name) {
   return false;
 }
 
+async function appendLeadToSheet(env, lead) {
+  if (!env.GOOGLE_SHEET_ID || !env.GOOGLE_SHEETS_REFRESH_TOKEN) return;
+
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: env.GOOGLE_SHEETS_CLIENT_ID,
+      client_secret: env.GOOGLE_SHEETS_CLIENT_SECRET,
+      refresh_token: env.GOOGLE_SHEETS_REFRESH_TOKEN,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const { access_token } = await tokenRes.json();
+  if (!access_token) throw new Error('Sheets token refresh failed');
+
+  const row = [
+    lead.id,
+    lead.created_at?.slice(0, 16).replace('T', ' ') ?? '',
+    lead.first_name, lead.last_name, lead.email,
+    lead.phone ?? '', lead.county ?? '', lead.divorce_stage ?? '',
+    lead.children_involved ?? '', lead.asset_complexity ?? '', lead.description ?? '',
+  ];
+
+  await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/Leads!A:K:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: [row] }),
+    }
+  );
+}
+
 async function sendLeadEmail(env, lead) {
   const rows = [
     ['Name', `${lead.first_name} ${lead.last_name}`],
@@ -92,7 +126,7 @@ async function sendLeadEmail(env, lead) {
 }
 
 export async function onRequestPost(context) {
-  const { request, env } = context;
+  const { request, env, waitUntil } = context;
 
   let body;
   try {
@@ -155,7 +189,7 @@ export async function onRequestPost(context) {
       if (dupCheck) status = 'duplicate';
     }
 
-    await env.DB.prepare(`
+    const insertResult = await env.DB.prepare(`
       INSERT INTO leads
         (first_name, last_name, email, phone, county, divorce_stage,
          children_involved, asset_complexity, description, consent, ip_address, status)
@@ -168,14 +202,17 @@ export async function onRequestPost(context) {
     ).run();
 
     if (status === 'new') {
-      try {
-        await sendLeadEmail(env, {
-          first_name, last_name, email, phone, county, divorce_stage,
-          children_involved, asset_complexity, description, ip_address: ip, created_at,
-        });
-      } catch (emailErr) {
-        console.error('Email send failed:', emailErr);
-      }
+      const lead = {
+        id: insertResult?.meta?.last_row_id ?? null,
+        first_name, last_name, email, phone, county, divorce_stage,
+        children_involved, asset_complexity, description, ip_address: ip, created_at,
+      };
+      waitUntil(
+        Promise.all([
+          sendLeadEmail(env, lead).catch(err => console.error('Email failed:', err)),
+          appendLeadToSheet(env, lead).catch(err => console.error('Sheets failed:', err)),
+        ])
+      );
     }
 
     return corsJson({ success: true });
