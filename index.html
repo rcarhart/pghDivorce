@@ -605,8 +605,7 @@
         const data = await res.json();
 
         if (res.ok && data.success) {
-          form.style.display = 'none';
-          document.getElementById('form-success').style.display = 'block';
+          window.location.href = '/thank-you';
         } else {
           errorEl.textContent = data.error || 'Something went wrong. Please try again.';
           errorEl.style.display = 'block';
